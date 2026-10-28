@@ -1,0 +1,362 @@
+-- ==========================================
+-- 1. 建立 UI 介面與左上角水印
+-- ==========================================
+if game.CoreGui:FindFirstChild("TowerFlyUI") then
+    game.CoreGui.TowerFlyUI:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TowerFlyUI"
+ScreenGui.Parent = game.CoreGui
+
+local Watermark = Instance.new("TextLabel")
+Watermark.Size = UDim2.new(0, 250, 0, 35)
+Watermark.Position = UDim2.new(0, 80, 0, 10)
+Watermark.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+Watermark.BackgroundTransparency = 0.3
+Watermark.Text = "t.me/xiaoJiaNB6667"
+Watermark.TextColor3 = Color3.fromRGB(255, 255, 255)
+Watermark.TextSize = 20
+Watermark.Font = Enum.Font.FredokaOne
+Watermark.Parent = ScreenGui
+
+-- 主面板
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 240, 0, 350) 
+MainFrame.Position = UDim2.new(0.5, -120, 0.4, -175)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.BorderColor3 = Color3.fromRGB(0, 255, 255)
+MainFrame.BorderSizePixel = 2
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(0, 100, 100)
+Title.Text = "🦸‍♂️ 地獄塔多功能"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Parent = MainFrame
+
+local function createBtn(text, posY, bgColor)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.8, 0, 0, 40)
+    btn.Position = UDim2.new(0.1, 0, 0, posY)
+    btn.BackgroundColor3 = bgColor or Color3.fromRGB(50, 50, 50)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextScaled = true
+    btn.Parent = MainFrame
+    return btn
+end
+
+-- 按鈕配置
+local FlyBtn = createBtn("點我啟動飛行", 35)
+local UpBtn = createBtn("⬆️ 上升", 85, Color3.fromRGB(50, 150, 50))
+UpBtn.Size = UDim2.new(0.35, 0, 0, 40); UpBtn.Position = UDim2.new(0.1, 0, 0, 85); UpBtn.Visible = false
+
+local DownBtn = createBtn("⬇️ 下降", 85, Color3.fromRGB(150, 50, 50))
+DownBtn.Size = UDim2.new(0.35, 0, 0, 40); DownBtn.Position = UDim2.new(0.55, 0, 0, 85); DownBtn.Visible = false
+
+local CombinedMapBtn = createBtn("🩸 滿版水印: 關閉", 135, Color3.fromRGB(100, 50, 50))
+
+-- 🎁 驚喜按鈕
+local SurpriseBtn = createBtn("🎁 驚喜", 185, Color3.fromRGB(200, 50, 200))
+
+-- 🚀 傳送功能 UI
+local TeleportInput = Instance.new("TextBox")
+TeleportInput.Size = UDim2.new(0.4, 0, 0, 35)
+TeleportInput.Position = UDim2.new(0.1, 0, 0, 235)
+TeleportInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+TeleportInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeleportInput.PlaceholderText = "輸入玩家名字"
+TeleportInput.Text = ""
+TeleportInput.Parent = MainFrame
+
+local TeleportBtn = createBtn("傳送", 235, Color3.fromRGB(200, 100, 0))
+TeleportBtn.Size = UDim2.new(0.4, 0, 0, 35)
+TeleportBtn.Position = UDim2.new(0.5, 0, 0, 235)
+
+-- 隱藏 UI
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -30, 0, 0)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0); CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255); CloseBtn.Parent = MainFrame
+
+local OpenBtn = Instance.new("TextButton")
+OpenBtn.Size = UDim2.new(0, 40, 0, 40); OpenBtn.Position = UDim2.new(0.05, 0, 0.3, 0)
+OpenBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 100); OpenBtn.Text = "🦸‍♂️"
+OpenBtn.TextScaled = true; OpenBtn.Visible = false; OpenBtn.Parent = ScreenGui
+
+CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false; OpenBtn.Visible = true end)
+OpenBtn.MouseButton1Click:Connect(function() MainFrame.Visible = true; OpenBtn.Visible = false end)
+
+-- ==========================================
+-- 2. 核心變數
+-- ==========================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local isFlying, isGoingUp, isGoingDown = false, false, false
+local flySpeed = 60
+local isMapModified = false
+local isSurpriseActive = false
+
+-- ==========================================
+-- 3. 傳送系統
+-- ==========================================
+TeleportBtn.MouseButton1Click:Connect(function()
+    local targetName = TeleportInput.Text
+    if targetName == "" then return end
+    
+    local targetPlayer = Players:FindFirstChild(targetName)
+    if targetPlayer and targetPlayer.Character then
+        local targetHrp = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local myChar = LocalPlayer.Character
+        if targetHrp and myChar and myChar:FindFirstChild("HumanoidRootPart") then
+            myChar.HumanoidRootPart.CFrame = targetHrp.CFrame * CFrame.new(0, 3, 0)
+        end
+    else
+        TeleportInput.Text = "找不到玩家"
+        TeleportInput.TextColor3 = Color3.fromRGB(255, 0, 0)
+        task.wait(1.5)
+        TeleportInput.Text = ""
+        TeleportInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end
+end)
+
+-- ==========================================
+-- 4. 飛行系統
+-- ==========================================
+FlyBtn.MouseButton1Click:Connect(function()
+    isFlying = not isFlying
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not hrp or not humanoid then return end
+
+    if isFlying then
+        FlyBtn.Text = "飛行中... (點我關閉)"
+        FlyBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+        UpBtn.Visible, DownBtn.Visible = true, true
+        humanoid.PlatformStand = true
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+        
+        local bv = Instance.new("BodyVelocity")
+        bv.Name = "TowerFlyVelocity"
+        bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+        bv.Velocity = Vector3.new(0, 0, 0)
+        bv.Parent = hrp
+    else
+        FlyBtn.Text = "點我啟動飛行"
+        FlyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        UpBtn.Visible, DownBtn.Visible = false, false
+        stopFlying(char)
+    end
+end)
+
+UpBtn.MouseButton1Down:Connect(function() isGoingUp = true end)
+UpBtn.MouseButton1Up:Connect(function() isGoingUp = false end)
+UpBtn.MouseLeave:Connect(function() isGoingUp = false end)
+DownBtn.MouseButton1Down:Connect(function() isGoingDown = true end)
+DownBtn.MouseButton1Up:Connect(function() isGoingDown = false end)
+DownBtn.MouseLeave:Connect(function() isGoingDown = false end)
+
+function stopFlying(char)
+    local humanoid = char:FindFirstChild("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if humanoid then
+        humanoid.PlatformStand = false
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+    end
+    if hrp and hrp:FindFirstChild("TowerFlyVelocity") then
+        hrp.TowerFlyVelocity:Destroy()
+    end
+    isGoingUp, isGoingDown = false, false
+end
+
+RunService.RenderStepped:Connect(function()
+    if isFlying then
+        local char = LocalPlayer.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local humanoid = char:FindFirstChild("Humanoid")
+        local bv = hrp and hrp:FindFirstChild("TowerFlyVelocity")
+
+        if hrp and humanoid and bv then
+            local lookVector = Camera.CFrame.LookVector
+            local flatLookVector = Vector3.new(lookVector.X, 0, lookVector.Z).Unit
+            hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + flatLookVector)
+
+            local moveDir = humanoid.MoveDirection 
+            local finalVelocity = moveDir * flySpeed
+            if isGoingUp then finalVelocity = finalVelocity + Vector3.new(0, flySpeed, 0) end
+            if isGoingDown then finalVelocity = finalVelocity - Vector3.new(0, flySpeed, 0) end
+            if moveDir.Magnitude == 0 and not isGoingUp and not isGoingDown then
+                finalVelocity = Vector3.new(0, 0, 0)
+            end
+            bv.Velocity = finalVelocity
+        end
+    end
+end)
+
+-- ==========================================
+-- 5. 滿版小字水印系統
+-- ==========================================
+local originalData = {}
+
+local function modifyWholeMap(enable)
+    for _, v in pairs(workspace:GetDescendants()) do
+        if (v:IsA("BasePart") or v:IsA("MeshPart")) then
+            local isChar = false
+            for _, player in pairs(Players:GetPlayers()) do
+                if player.Character and v:IsDescendantOf(player.Character) then isChar = true break end
+            end
+            
+            if not isChar and v.Name ~= "Terrain" then
+                if enable then
+                    if not originalData[v] then originalData[v] = {Color = v.Color, Material = v.Material} end
+                    v.Color = Color3.fromRGB(150, 0, 0)
+                    v.Material = Enum.Material.SmoothPlastic
+                    
+                    if (v.Size.X > 5 or v.Size.Y > 5 or v.Size.Z > 5) and not v:FindFirstChild("HackTextGui") then
+                        local gui = Instance.new("SurfaceGui")
+                        gui.Name = "HackTextGui"
+                        gui.Face = Enum.NormalId.Top
+                        gui.PixelsPerStud = 50
+                        gui.Parent = v
+                        
+                        local text = Instance.new("TextLabel")
+                        text.Size = UDim2.new(1, 0, 1, 0)
+                        text.BackgroundTransparency = 1
+                        text.Text = "xiaoJiaNB6667"
+                        text.TextColor3 = Color3.fromRGB(255, 50, 50)
+                        text.TextStrokeTransparency = 0.5
+                        text.TextScaled = false 
+                        text.TextSize = 24
+                        text.Font = Enum.Font.FredokaOne
+                        text.Parent = gui
+                    end
+                else
+                    if originalData[v] then
+                        v.Color = originalData[v].Color
+                        v.Material = originalData[v].Material
+                        originalData[v] = nil
+                    end
+                    local gui = v:FindFirstChild("HackTextGui")
+                    if gui then gui:Destroy() end
+                end
+            end
+        end
+    end
+end
+
+CombinedMapBtn.MouseButton1Click:Connect(function()
+    isMapModified = not isMapModified
+    if isMapModified then
+        CombinedMapBtn.Text = "處理中...請稍等"
+        CombinedMapBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        task.wait(0.1)
+        modifyWholeMap(true)
+        CombinedMapBtn.Text = "🩸 滿版水印: 開啟"
+    else
+        CombinedMapBtn.Text = "🩸 滿版水印: 關閉"
+        CombinedMapBtn.BackgroundColor3 = Color3.fromRGB(100, 50, 50)
+        modifyWholeMap(false)
+    end
+end)
+
+-- ==========================================
+-- 6. 驚喜系統 (脫衣 + 皮膚色 + 無頭無腳 + 身上水印)
+-- ==========================================
+SurpriseBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    isSurpriseActive = not isSurpriseActive
+
+    if isSurpriseActive then
+        SurpriseBtn.Text = "恢復正常"
+        SurpriseBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+
+        -- 1. 脫掉所有衣服
+        if char:FindFirstChild("Shirt") then char.Shirt.Transparency = 1 end
+        if char:FindFirstChild("Pants") then char.Pants.Transparency = 1 end
+        if char:FindFirstChild("Shirt Graphic") then char["Shirt Graphic"].Transparency = 1 end
+        
+        -- 2. 隱藏配件 (帽子等)
+        for _, acc in pairs(char:GetChildren()) do
+            if acc:IsA("Accessory") then acc.Handle.Transparency = 1 end
+        end
+
+        -- 3. 變成皮膚色 & 隱藏頭/腳 & 貼上身體水印
+        for _, part in pairs(char:GetChildren()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                -- 變更為經典的皮膚色 (Roblox 預設膚色)
+                part.Color = Color3.fromRGB(234, 184, 146) 
+                
+                -- 隱藏頭部與雙腳
+                if part.Name:match("Head") or part.Name:match("Leg") or part.Name:match("Foot") then
+                    part.Transparency = 1
+                end
+
+                -- 在身上 (軀幹與手臂) 貼上水印
+                if part.Name:match("Torso") or part.Name:match("Arm") or part.Name:match("Hand") then
+                    -- 清除舊水印防止重複
+                    local oldGui = part:FindFirstChild("BodyWatermark")
+                    if oldGui then oldGui:Destroy() end
+
+                    local gui = Instance.new("SurfaceGui")
+                    gui.Name = "BodyWatermark"
+                    gui.Face = Enum.NormalId.Front -- 貼在正面
+                    gui.PixelsPerStud = 50
+                    gui.Parent = part
+                    
+                    local text = Instance.new("TextLabel")
+                    text.Size = UDim2.new(1, 0, 1, 0)
+                    text.BackgroundTransparency = 1
+                    text.Text = "xiaoJiaNB6667"
+                    text.TextColor3 = Color3.fromRGB(255, 50, 50)
+                    text.TextStrokeTransparency = 0.5
+                    text.TextScaled = true
+                    text.Font = Enum.Font.FredokaOne
+                    text.Parent = gui
+                end
+            end
+        end
+    else
+        -- 恢復正常
+        SurpriseBtn.Text = "驚喜"
+        SurpriseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 200)
+
+        if char:FindFirstChild("Shirt") then char.Shirt.Transparency = 0 end
+        if char:FindFirstChild("Pants") then char.Pants.Transparency = 0 end
+        if char:FindFirstChild("Shirt Graphic") then char["Shirt Graphic"].Transparency = 0 end
+
+        for _, acc in pairs(char:GetChildren()) do
+            if acc:IsA("Accessory") then acc.Handle.Transparency = 0 end
+        end
+
+        for _, part in pairs(char:GetChildren()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                part.Transparency = 0
+                part.Color = Color3.fromRGB(255, 255, 255) -- 恢復白色 (或讓遊戲自動加載原本的顏色)
+                local gui = part:FindFirstChild("BodyWatermark")
+                if gui then gui:Destroy() end
+            end
+        end
+    end
+end)
+
+-- 重生重置
+LocalPlayer.CharacterAdded:Connect(function()
+    isFlying, isGoingUp, isGoingDown, isSurpriseActive = false, false, false, false
+    FlyBtn.Text = "啟動飛行"
+    FlyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    UpBtn.Visible, DownBtn.Visible = false, false
+    SurpriseBtn.Text = "驚喜"
+    SurpriseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 200)
+end)
